@@ -1,0 +1,7 @@
+dist
+node_modules
+*.wasm
+*.log
+.env
+.env.local
+

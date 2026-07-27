@@ -1,0 +1,37 @@
+{
+  "Pure Black (Re`OS Default)": {
+    "background": "#000000",
+    "foreground": "#E0E0E0",
+    "prompt": "#FFFFFF",
+    "editorBackground": "#0A0A0A",
+    "statusBackground": "#111111"
+  },
+  "Classic CMD": {
+    "background": "#0C0C0C",
+    "foreground": "#CCCCCC",
+    "prompt": "#CCCCCC",
+    "editorBackground": "#0C0C0C",
+    "statusBackground": "#181818"
+  },
+  "VS Code Dark+": {
+    "background": "#1E1E1E",
+    "foreground": "#D4D4D4",
+    "prompt": "#569CD6",
+    "editorBackground": "#1E1E1E",
+    "statusBackground": "#007ACC"
+  },
+  "Matrix": {
+    "background": "#000000",
+    "foreground": "#00FF66",
+    "prompt": "#00FF66",
+    "editorBackground": "#001100",
+    "statusBackground": "#002200"
+  },
+  "Light": {
+    "background": "#FFFFFF",
+    "foreground": "#1A1A1A",
+    "prompt": "#0066CC",
+    "editorBackground": "#F5F5F5",
+    "statusBackground": "#E0E0E0"
+  }
+}

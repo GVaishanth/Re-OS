@@ -1,0 +1,626 @@
+@import './themes.css';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#reos-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Consolas', 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
+  font-size: var(--reos-font-size, 14px);
+  background-color: var(--reos-bg);
+  color: var(--reos-fg);
+}
+
+.reos-shell-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 10% Chrome Layer: Tab Bar (Only Editor Code Files) + Top-Right Action Buttons */
+.reos-tab-bar {
+  height: 34px;
+  background: var(--reos-editor-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  user-select: none;
+}
+
+.reos-tab-bar-empty {
+  font-size: 12px;
+  opacity: 0.5;
+  padding-left: 8px;
+  font-style: italic;
+}
+
+.reos-tabs-strip {
+  display: flex;
+  overflow-x: auto;
+  gap: 4px;
+  height: 100%;
+  align-items: flex-end;
+  flex: 1;
+}
+
+.reos-tab-bar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 12px;
+  flex-shrink: 0;
+}
+
+.reos-action-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: inherit;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.reos-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.reos-tab-item {
+  padding: 0 14px;
+  height: 29px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  color: inherit;
+  opacity: 0.65;
+  transition: all 0.15s ease;
+}
+
+.reos-tab-item:hover {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.reos-tab-item.active {
+  background: var(--reos-bg);
+  color: var(--reos-prompt);
+  border-color: rgba(255, 255, 255, 0.15);
+  font-weight: bold;
+  opacity: 1;
+}
+
+.reos-tab-dirty-dot {
+  color: #ffaa00;
+  font-weight: bold;
+}
+
+.reos-tab-close {
+  opacity: 0.4;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.reos-tab-close:hover {
+  opacity: 1;
+  background: rgba(255, 80, 80, 0.3);
+}
+
+/* Middle Split Zone (Adaptive Flex Layout) */
+.reos-main-split {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.reos-editor-zone {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: flex 0.2s ease;
+}
+
+.reos-editor-zone.hidden {
+  display: none !important;
+}
+
+.reos-editor-zone.active {
+  flex: 1 1 55%;
+}
+
+.reos-monaco-container {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.reos-editor-wrapper {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--reos-editor-bg);
+}
+
+.reos-editor-linenumbers {
+  width: 54px;
+  padding: 12px 8px;
+  text-align: right;
+  user-select: none;
+  opacity: 0.4;
+  font-size: 14px;
+  line-height: 20px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.15);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.reos-editor-linenumbers div {
+  height: 20px;
+}
+
+.reos-editor-textarea {
+  flex: 1;
+  padding: 12px;
+  background: transparent;
+  color: var(--reos-fg);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: auto;
+  white-space: pre;
+}
+
+.reos-line-error-flash {
+  background: rgba(255, 60, 0, 0.45) !important;
+  color: #fff !important;
+  font-weight: bold;
+  border-radius: 2px;
+  transition: background 0.6s ease;
+}
+
+/* Right-Middle Explorer Toggle Button (`<` / `>`) */
+.reos-explorer-toggle-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 50px;
+  background: var(--reos-status-bg);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  transition:
+    right 0.15s ease-out,
+    background 0.15s ease;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+
+.reos-explorer-toggle-btn:hover {
+  background: var(--reos-bg);
+  border-color: var(--reos-prompt);
+}
+
+.reos-explorer-toggle-btn.open {
+  right: 290px;
+}
+
+/* Explorer CLI Overlay (GitHub Nodes Style) */
+.reos-explorer-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.reos-explorer-panel {
+  pointer-events: auto;
+  width: 290px;
+  height: 100%;
+  background: var(--reos-status-bg);
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -6px 0 20px rgba(0, 0, 0, 0.6);
+  animation: slideInRight 0.15s ease-out;
+}
+
+.reos-explorer-panel.hidden {
+  display: none !important;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.reos-explorer-header {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.reos-explorer-close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.reos-explorer-close-btn:hover {
+  opacity: 1;
+}
+
+.reos-explorer-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 4px;
+  font-size: 13px;
+}
+
+.reos-explorer-root-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-weight: bold;
+  margin: 4px 6px 8px 6px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.reos-explorer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease;
+  line-height: 1.4;
+}
+
+.reos-explorer-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.reos-node-arrow {
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.reos-explorer-icon {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.85;
+}
+
+.reos-explorer-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Settings Modal Overlay (`⚙ Settings`) */
+.reos-settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.reos-settings-modal.hidden {
+  display: none !important;
+}
+
+.reos-settings-card {
+  width: 480px;
+  max-width: 90vw;
+  max-height: 85vh;
+  background: var(--reos-status-bg);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  font-family: inherit;
+}
+
+.reos-settings-header {
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.reos-settings-close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 20px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.reos-settings-close-btn:hover {
+  opacity: 1;
+}
+
+.reos-settings-body {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.reos-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reos-settings-label {
+  font-weight: bold;
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+.reos-settings-select {
+  padding: 6px 8px;
+  background: var(--reos-bg);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.reos-settings-reset-btn {
+  padding: 8px 12px;
+  background: rgba(255, 60, 0, 0.15);
+  border: 1px solid rgba(255, 60, 0, 0.4);
+  color: #ff6644;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+  margin-top: 4px;
+  transition: background 0.15s ease;
+}
+
+.reos-settings-reset-btn:hover {
+  background: rgba(255, 60, 0, 0.3);
+  color: #fff;
+}
+
+.reos-settings-about {
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+/* 70% Windows CMD Layer: Permanent Terminal Zone */
+.reos-terminal-zone {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--reos-bg);
+  transition: flex 0.2s ease;
+}
+
+.reos-terminal-zone.docked-split {
+  flex: 1 1 45%;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.reos-terminal-container {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.reos-terminal-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  padding: 14px;
+  overflow-y: auto;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.reos-terminal-output {
+  flex: 0 0 auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.reos-terminal-error {
+  color: #ff5533;
+}
+
+.reos-error-link {
+  color: #ff5533;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: bold;
+  background: rgba(255, 85, 51, 0.1);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+
+.reos-error-link:hover {
+  color: #ffaa88;
+  background: rgba(255, 85, 51, 0.25);
+}
+
+.reos-terminal-input-line {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.reos-prompt-prefix {
+  color: var(--reos-prompt);
+  font-weight: bold;
+  white-space: pre;
+}
+
+.reos-terminal-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  caret-color: var(--reos-prompt);
+  padding: 0;
+  margin: 0;
+}
+
+/* Bottom Status Bar */
+.reos-status-bar {
+  height: 28px;
+  background: var(--reos-status-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 14px;
+  font-size: 12px;
+  user-select: none;
+  flex-shrink: 0;
+  gap: 24px;
+}
+
+.reos-status-item {
+  display: flex;
+  align-items: center;
+  opacity: 0.85;
+}
+
+.reos-status-status {
+  font-weight: bold;
+}
+
+.reos-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.reos-status-dot.ready {
+  background: #00ff66;
+  box-shadow: 0 0 6px #00ff66;
+}
+
+.reos-status-dot.active {
+  background: #ffaa00;
+  box-shadow: 0 0 6px #ffaa00;
+  animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.reos-status-storage {
+  margin-left: auto;
+  opacity: 0.7;
+}
