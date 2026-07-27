@@ -11,6 +11,7 @@ import { RunCommandController } from '@modules/execution/RunCommandController';
 import { SettingsModule } from '@modules/config/SettingsModule';
 import { ThemeModule } from '@modules/config/ThemeModule';
 import { SettingsOverlayModule } from '@modules/config/SettingsOverlayModule';
+import { LayoutState } from './LayoutState';
 
 import {
   CdCommandModule,
@@ -62,6 +63,7 @@ export class AppShellModule implements IAppShellModule {
   private settings: SettingsModule;
   private theme: ThemeModule;
   private settingsOverlay: SettingsOverlayModule;
+  private layout: LayoutState;
 
   constructor() {
     this.bus = ReOSBus.getInstance();
@@ -77,6 +79,7 @@ export class AppShellModule implements IAppShellModule {
     this.settings = new SettingsModule();
     this.theme = new ThemeModule();
     this.settingsOverlay = new SettingsOverlayModule(this.settings);
+    this.layout = LayoutState.getInstance();
 
     void this.runController;
     this.registerCommands();
@@ -201,14 +204,19 @@ export class AppShellModule implements IAppShellModule {
         void (async () => {
           const active = this.editor.getActiveBuffer();
           if (active && active.path.toLowerCase().endsWith(targetPath.toLowerCase())) {
-            this.terminal.writeError(
-              `[Error: File '${targetPath}' is currently open inside the Editor buffer. Close before deleting.]\n`
-            );
+            this.terminal.writeError(`[Error: File '${targetPath}' is currently open. Close before deleting.]\n`);
             return;
           }
-          const success = await this.vfs.unlink(targetPath);
+          const isProtected = await this.vfs.isProtected(targetPath);
+          if (isProtected) {
+            this.terminal.writeError(`Access Denied: '${targetPath}' is protected.\n`);
+            return;
+          }
+          const success = await this.vfs.moveToRecycleBin(targetPath);
           if (!success) {
-            this.terminal.writeError(`Could Not Find ${targetPath}\n`);
+            this.terminal.writeError(`Could Not Delete ${targetPath}\n`);
+          } else {
+            this.terminal.writeOutput(`Moved to Recycle Bin: ${targetPath}\n`);
           }
         })();
       }
@@ -442,10 +450,12 @@ export class AppShellModule implements IAppShellModule {
         void (async () => {
           try {
             const exists = await this.vfs.exists(targetPath);
+            let text = '';
             if (!exists) {
               await this.vfs.writeFile(targetPath, '');
+            } else {
+              text = await this.vfs.readFileAsText(targetPath);
             }
-            const text = await this.vfs.readFileAsText(targetPath);
             const ext = targetPath.split('.').pop()?.toLowerCase() || '';
             let lang = 'Text';
             if (ext === 'c') lang = 'C';
@@ -464,10 +474,8 @@ export class AppShellModule implements IAppShellModule {
     });
 
     this.bus.subscribe('EDITOR:CLOSE', () => {
-      setTimeout(() => {
-        const count = this.tabManager.getTabsCount();
-        this.updateLayoutSplit(count > 0);
-      }, 10);
+      const count = this.tabManager.getTabsCount();
+      this.layout.setEditorOpen(count > 0);
     });
 
     this.bus.subscribe('TAB:SWITCH', event => {
@@ -475,21 +483,20 @@ export class AppShellModule implements IAppShellModule {
         const { path } = event.payload as any;
         if (path) {
           this.editor.switchBuffer(path);
-          this.updateLayoutSplit(true);
+          this.layout.setEditorOpen(true);
         } else {
-          this.updateLayoutSplit(false);
+          this.layout.setEditorOpen(false);
         }
       }
     });
 
-    this.bus.subscribe('EXPLORER:TOGGLE', () => {
-      const btn = document.getElementById('reos-explorer-toggle-btn');
-      if (btn) {
-        const isOpen = btn.innerText === '<';
-        btn.innerText = isOpen ? '>' : '<';
-        btn.classList.toggle('open', isOpen);
-      }
+    // Central handler — use single source of truth
+    this.bus.subscribe('EDITOR:OPEN', () => {
+      this.layout.setEditorOpen(true);
     });
+
+    // EXPLORER:TOGGLE is now handled exclusively inside ExplorerModule
+    // to avoid double-handling and state desync.
   }
 
   public async mount(rootElement: HTMLElement): Promise<void> {
@@ -557,9 +564,31 @@ export class AppShellModule implements IAppShellModule {
     if (settingsBtn)
       settingsBtn.addEventListener('click', () => this.bus.publish('SETTINGS:TOGGLE'));
 
+    // === EXPLORER TOGGLE - FINAL VERSION ===
     const explorerToggleBtn = rootElement.querySelector('#reos-explorer-toggle-btn');
-    if (explorerToggleBtn)
-      explorerToggleBtn.addEventListener('click', () => this.bus.publish('EXPLORER:TOGGLE'));
+    if (explorerToggleBtn) {
+      explorerToggleBtn.addEventListener('click', () => {
+        const panel = document.getElementById('reos-explorer-panel');
+        const btn = explorerToggleBtn as HTMLButtonElement;
+        if (!panel || !btn) return;
+
+        const currentlyOpen = !panel.classList.contains('hidden');
+
+        if (currentlyOpen) {
+            panel.classList.add('hidden');
+            btn.innerText = '<';
+            btn.classList.remove('open');
+        } else {
+            panel.classList.remove('hidden');
+            btn.innerText = '>';
+            btn.classList.add('open');
+
+            if (this.explorer && this.vfs) {
+                void (this.explorer as any).renderOverlayTree?.(this.vfs.getCWD());
+            }
+        }
+      });
+    }
 
     // Drag and drop file upload over terminal
     rootElement.addEventListener('dragover', e => e.preventDefault());
@@ -572,23 +601,12 @@ export class AppShellModule implements IAppShellModule {
       }
     });
 
-    this.updateLayoutSplit(false);
+    this.layout.setEditorOpen(false);
+    this.layout.setExplorerOpen(false);
   }
 
+  // DEPRECATED — use LayoutState instead
   public updateLayoutSplit(hasActiveEditor: boolean): void {
-    const editorZone = document.getElementById('reos-editor-zone');
-    const terminalZone = document.getElementById('reos-terminal-zone');
-    if (!editorZone || !terminalZone) return;
-
-    if (hasActiveEditor) {
-      editorZone.classList.remove('hidden');
-      editorZone.classList.add('active');
-      terminalZone.classList.add('docked-split');
-    } else {
-      editorZone.classList.add('hidden');
-      editorZone.classList.remove('active');
-      terminalZone.classList.remove('docked-split');
-      this.terminal.focus();
-    }
+    this.layout.setEditorOpen(hasActiveEditor);
   }
 }

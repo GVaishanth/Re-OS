@@ -1,6 +1,7 @@
 import { ReOSBus } from '@core/ReOSBus';
 import { IEditorBuffer } from '@types';
 import { VFSModule } from '@modules/filesystem/VFSModule';
+import { LayoutState } from '@modules/shell/LayoutState';
 
 export interface IEditorModule {
   mount(container: HTMLElement): void;
@@ -182,6 +183,10 @@ export class EditorModule implements IEditorModule {
     }
     this.switchBuffer(path);
     this.bus.publish('EDITOR:OPEN', { path, language, content: initialContent });
+
+    // Use single source of truth
+    const layout = LayoutState.getInstance();
+    layout.setEditorOpen(true);
   }
 
   public switchBuffer(path: string): void {

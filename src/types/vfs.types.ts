@@ -7,6 +7,11 @@ export interface IVFSNodeMetadata {
   size: number;
   createdAt: number;
   modifiedAt: number;
+  // Extended attributes for realistic OS behaviour
+  readOnly?: boolean;
+  protected?: boolean;
+  hidden?: boolean;
+  inRecycleBin?: boolean;
 }
 
 export interface IFileDescriptor {

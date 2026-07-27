@@ -1,4 +1,4 @@
-export type SupportedLanguage = 'C' | 'C++' | 'Python' | 'Java' | 'Text' | 'Markdown';
+export type SupportedLanguage = 'C' | 'C++' | 'Python' | 'Java' | 'Text';
 
 export interface ILanguageDetectionResult {
   language: SupportedLanguage;

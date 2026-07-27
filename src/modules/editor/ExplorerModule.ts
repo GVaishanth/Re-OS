@@ -2,40 +2,53 @@ import { ReOSBus } from '@core/ReOSBus';
 import { MONOCHROME_16X16_ICONS } from '@assets/icons';
 import { VFSModule } from '@modules/filesystem/VFSModule';
 
-export interface IExplorerItem {
-  path: string;
-  name: string;
-  isDirectory: boolean;
-  iconSvgGlyph: string;
-}
-
 export interface IExplorerModule {
   mount(container: HTMLElement): void;
   renderOverlayTree(cwd: string): Promise<void>;
   closeOverlay(): void;
   toggleOverlay(cwd: string): Promise<void>;
+  refresh(): void;
+  setActiveFile(path: string | null): void;
 }
 
 export class ExplorerModule implements IExplorerModule {
   private bus: ReOSBus;
   private vfs?: VFSModule;
   private container?: HTMLElement;
-  private isOpen: boolean = false;
   private expandedDirs: Set<string> = new Set(['C:\\Users\\ReOS']);
+  private activeFilePath: string | null = null;
+  private currentCwd: string = 'C:\\Users\\ReOS';
 
   constructor(vfs?: VFSModule) {
     this.bus = ReOSBus.getInstance();
     this.vfs = vfs;
 
-    this.bus.subscribe('EXPLORER:TOGGLE', () => {
-      if (this.vfs) {
-        void this.toggleOverlay(this.vfs.getCWD());
+    // Explorer toggle is handled directly from the button click in AppShellModule
+    // to prevent double-handling and state desync.
+
+    // Real-time VFS synchronization
+    this.bus.subscribe('VFS:FILE_CREATED', () => this.refresh());
+    this.bus.subscribe('VFS:FILE_MODIFIED', () => this.refresh());
+    this.bus.subscribe('VFS:FILE_DELETED', () => this.refresh());
+    this.bus.subscribe('VFS:CWD_CHANGED', (event) => {
+      const payload = event.payload as any;
+      if (payload?.cwd) {
+        this.currentCwd = payload.cwd;
+        this.expandedDirs.add(this.currentCwd);
+        this.refresh();
       }
     });
 
-    this.bus.subscribe('EDITOR:OPEN', () => {
-      if (this.isOpen && this.vfs) {
-        void this.renderOverlayTree(this.vfs.getCWD());
+    // Active file highlight
+    this.bus.subscribe('EDITOR:OPEN', (event) => {
+      const payload = event.payload as any;
+      if (payload?.path) this.setActiveFile(payload.path);
+    });
+
+    this.bus.subscribe('EDITOR:CLOSE', (event) => {
+      const payload = event.payload as any;
+      if (payload?.path && payload.path === this.activeFilePath) {
+        this.setActiveFile(null);
       }
     });
   }
@@ -47,7 +60,7 @@ export class ExplorerModule implements IExplorerModule {
         <div class="reos-explorer-header">
           <span style="display:flex; align-items:center; gap:6px;">
             <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 0 1 1-1Z"/></svg>
-            EXPLORER (GITHUB NODES)
+            EXPLORER
           </span>
           <button id="reos-explorer-close-btn" class="reos-explorer-close-btn">&times;</button>
         </div>
@@ -61,11 +74,52 @@ export class ExplorerModule implements IExplorerModule {
     }
   }
 
+  // toggle() is now only used as a fallback
+  public toggle(): void {
+    const panel = this.container?.querySelector('#reos-explorer-panel') as HTMLElement | null;
+    const btn = document.getElementById('reos-explorer-toggle-btn');
+
+    if (!panel) return;
+
+    const isOpen = !panel.classList.contains('hidden');
+
+    if (isOpen) {
+      // Close
+      panel.classList.add('hidden');
+      if (btn) {
+        btn.innerText = '<';
+        btn.classList.remove('open');
+      }
+    } else {
+      // Open
+      if (this.vfs) {
+        void this.renderOverlayTree(this.vfs.getCWD());
+      }
+    }
+  }
+
   public async toggleOverlay(cwd: string): Promise<void> {
     if (this.isOpen) {
       this.closeOverlay();
     } else {
       await this.renderOverlayTree(cwd);
+    }
+  }
+
+  public refresh(): void {
+    const panel = this.container?.querySelector('#reos-explorer-panel') as HTMLElement | null;
+    const isOpen = panel ? !panel.classList.contains('hidden') : false;
+    if (isOpen && this.vfs) {
+      void this.renderOverlayTree(this.currentCwd || this.vfs.getCWD());
+    }
+  }
+
+  public setActiveFile(path: string | null): void {
+    this.activeFilePath = path;
+    const panel = this.container?.querySelector('#reos-explorer-panel') as HTMLElement | null;
+    const isOpen = panel ? !panel.classList.contains('hidden') : false;
+    if (isOpen) {
+      this.refresh();
     }
   }
 
@@ -84,10 +138,12 @@ export class ExplorerModule implements IExplorerModule {
       toggleBtn.classList.add('open');
     }
 
+    this.currentCwd = cwd;
+    this.expandedDirs.add(cwd);
+
     try {
-      this.expandedDirs.add(cwd);
       let treeHtml = `
-        <div class="reos-explorer-root-badge">
+        <div class="reos-explorer-root-badge" style="background: rgba(255,255,255,0.08);">
           <span class="reos-explorer-icon">${MONOCHROME_16X16_ICONS.folder}</span>
           <span>${cwd}</span>
         </div>
@@ -125,6 +181,12 @@ export class ExplorerModule implements IExplorerModule {
       const entries = await this.vfs.readdir(dirPath);
       let html = '';
 
+      // Sort: directories first, then alphabetical
+      entries.sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
       for (const entry of entries) {
         const isDir = entry.type === 'directory';
         let icon: string = MONOCHROME_16X16_ICONS.text;
@@ -133,19 +195,28 @@ export class ExplorerModule implements IExplorerModule {
         } else {
           const lower = entry.name.toLowerCase();
           if (lower.endsWith('.c') || lower.endsWith('.h')) icon = MONOCHROME_16X16_ICONS.c;
-          else if (lower.endsWith('.cpp') || lower.endsWith('.hpp') || lower.endsWith('.cc'))
-            icon = MONOCHROME_16X16_ICONS.cpp;
+          else if (lower.endsWith('.cpp') || lower.endsWith('.hpp') || lower.endsWith('.cc')) icon = MONOCHROME_16X16_ICONS.cpp;
           else if (lower.endsWith('.py')) icon = MONOCHROME_16X16_ICONS.python;
           else if (lower.endsWith('.java')) icon = MONOCHROME_16X16_ICONS.java;
           else if (lower.endsWith('.md')) icon = MONOCHROME_16X16_ICONS.markdown;
         }
 
         const isExpanded = isDir && this.expandedDirs.has(entry.path);
+        const isActive = this.activeFilePath === entry.path;
+        const isCurrentDir = this.currentCwd === entry.path;
+
         const arrow = isDir ? (isExpanded ? '&#9662;' : '&#9656;') : '&nbsp;&nbsp;';
         const indent = depth * 14;
 
+        let extraClass = '';
+        if (isActive) extraClass += ' active-file';
+        if (isCurrentDir) extraClass += ' current-dir';
+
         html += `
-          <div class="reos-explorer-item ${isDir ? 'dir-node' : 'file-node'}" data-path="${entry.path}" data-type="${entry.type}" style="padding-left: ${indent + 8}px;">
+          <div class="reos-explorer-item ${isDir ? 'dir-node' : 'file-node'}${extraClass}" 
+               data-path="${entry.path}" 
+               data-type="${entry.type}" 
+               style="padding-left: ${indent + 8}px; ${isActive || isCurrentDir ? 'background: rgba(100, 149, 237, 0.15);' : ''}">
             <span class="reos-node-arrow">${arrow}</span>
             <span class="reos-explorer-icon">${icon}</span>
             <span class="reos-explorer-name">${entry.name}</span>
