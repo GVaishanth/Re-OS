@@ -2,39 +2,36 @@ import { ReOSBus } from '@core/ReOSBus';
 
 export interface ILayoutState {
   editorOpen: boolean;
-  explorerOpen: boolean;
   setEditorOpen(open: boolean): void;
-  setExplorerOpen(open: boolean): void;
   toggleEditor(): void;
-  toggleExplorer(): void;
 }
 
 export class LayoutState implements ILayoutState {
   private static instance: LayoutState;
   private bus = ReOSBus.getInstance();
+  private unsubscribers: (() => void)[] = [];
 
   public editorOpen: boolean = false;
-  public explorerOpen: boolean = false;
 
-  private constructor() {
-    // Listen for explicit layout requests
-    this.bus.subscribe('LAYOUT:SET_EDITOR', (e) => {
+  private constructor() {}
+
+  private subscribeToEvents(): void {
+    this.unsubscribers.forEach(unsub => unsub());
+    this.unsubscribers = [];
+    this.editorOpen = false;
+
+    this.unsubscribers.push(this.bus.subscribe('LAYOUT:SET_EDITOR', (e) => {
       const open = (e.payload as any)?.open ?? false;
       this.editorOpen = open;
       this.apply();
-    });
-
-    this.bus.subscribe('LAYOUT:SET_EXPLORER', (e) => {
-      const open = (e.payload as any)?.open ?? false;
-      this.explorerOpen = open;
-      this.apply();
-    });
+    }));
   }
 
   public static getInstance(): LayoutState {
     if (!LayoutState.instance) {
       LayoutState.instance = new LayoutState();
     }
+    LayoutState.instance.subscribeToEvents();
     return LayoutState.instance;
   }
 
@@ -44,25 +41,13 @@ export class LayoutState implements ILayoutState {
     this.bus.publish('LAYOUT:EDITOR_CHANGED', { open });
   }
 
-  public setExplorerOpen(open: boolean): void {
-    this.explorerOpen = open;
-    this.apply();
-    this.bus.publish('LAYOUT:EXPLORER_CHANGED', { open });
-  }
-
   public toggleEditor(): void {
     this.setEditorOpen(!this.editorOpen);
   }
 
-  public toggleExplorer(): void {
-    this.setExplorerOpen(!this.explorerOpen);
-  }
-
   private apply(): void {
-    // Apply to DOM directly (single source of truth)
     const editorZone = document.getElementById('reos-editor-zone');
     const terminalZone = document.getElementById('reos-terminal-zone');
-    const explorerPanel = document.getElementById('reos-explorer-panel');
 
     if (editorZone) {
       if (this.editorOpen) {
@@ -81,14 +66,6 @@ export class LayoutState implements ILayoutState {
         terminalZone.classList.add('docked-split');
       } else {
         terminalZone.classList.remove('docked-split');
-      }
-    }
-
-    if (explorerPanel) {
-      if (this.explorerOpen) {
-        explorerPanel.classList.remove('hidden');
-      } else {
-        explorerPanel.classList.add('hidden');
       }
     }
   }

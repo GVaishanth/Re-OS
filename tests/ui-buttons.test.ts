@@ -30,7 +30,13 @@ describe('ReOS UI Buttons Audit', () => {
 
     // Clear storage
     try {
-      localStorage.clear();
+      if (typeof localStorage !== 'undefined') localStorage.clear();
+      if (typeof indexedDB !== 'undefined') {
+        const dbNames = ['reos_vfs_db_v1'];
+        for (const name of dbNames) {
+          indexedDB.deleteDatabase(name);
+        }
+      }
     } catch { /* ignore */ }
   });
 

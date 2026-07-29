@@ -1,5 +1,5 @@
 import { ReOSBus } from '@core/ReOSBus';
-import { IVFSNodeMetadata, IFileDescriptor } from '@types';
+import { IVFSNodeMetadata } from '@types';
 import { StorageAdapterModule } from './StorageAdapterModule';
 
 export interface IVFSModule {
@@ -58,6 +58,9 @@ export class VFSModule implements IVFSModule {
     this.nodes.set('c:\\\\users', { name: 'Users', path: 'C:\\Users', type: 'directory', size: 0, createdAt: Date.now(), modifiedAt: Date.now() });
     this.nodes.set('c:\\\\users\\\\reos', { name: 'ReOS', path: 'C:\\Users\\ReOS', type: 'directory', size: 0, createdAt: Date.now(), modifiedAt: Date.now() });
 
+    // Always create default filesystem first, then overlay saved files
+    await this.createDefaultFilesystem();
+
     const saved = await this.storageAdapter.loadVFSState();
 
     if (saved && saved.size > 0) {
@@ -65,7 +68,7 @@ export class VFSModule implements IVFSModule {
         const norm = this.normalizePath(path);
         this.ensureParentDirs(norm);
         this.nodes.set(norm.toLowerCase(), {
-          name: norm.split('\\\\').pop()!,
+          name: norm.split('\\').pop()!,
           path: norm,
           type: 'file',
           content: data.content,
@@ -74,8 +77,6 @@ export class VFSModule implements IVFSModule {
           modifiedAt: data.modifiedAt
         });
       }
-    } else {
-      await this.createDefaultFilesystem();
     }
 
     this.initialized = true;
@@ -108,7 +109,7 @@ export class VFSModule implements IVFSModule {
       const norm = this.normalizePath(f);
       this.ensureParentDirs(norm);
       this.nodes.set(norm.toLowerCase(), {
-        name: f.split('\\\\').pop()!,
+        name: f.split('\\').pop()!,
         path: norm,
         type: 'directory',
         size: 0,
@@ -119,7 +120,7 @@ export class VFSModule implements IVFSModule {
     }
 
     // Explicitly mark Admin as protected
-    this.nodes.set('c:\\\\admin', {
+    this.nodes.set('c:\\admin', {
       name: 'Admin',
       path: 'C:\\Admin',
       type: 'directory',
@@ -223,12 +224,12 @@ int main() {
 
   public async readdir(path?: string): Promise<IVFSNodeMetadata[]> {
     const target = this.normalizePath(path || this.cwd).toLowerCase();
-    const prefix = target + (target.endsWith('\\\\') ? '' : '\\\\');
+    const prefix = target + (target.endsWith('\\') ? '' : '\\');
     const results: IVFSNodeMetadata[] = [];
 
     for (const [key, node] of this.nodes.entries()) {
       if (key === target) continue;
-      if (key.startsWith(prefix) && !key.substring(prefix.length).includes('\\\\')) {
+      if (key.startsWith(prefix) && !key.substring(prefix.length).includes('\\')) {
         if (node.inRecycleBin) continue;
         results.push({
           name: node.name,
@@ -276,7 +277,8 @@ int main() {
     const norm = this.normalizePath(path);
     const key = norm.toLowerCase();
     const content = typeof data === 'string' ? data : new TextDecoder().decode(data);
-    const name = norm.split('\\\\').pop() || '';
+    const splitName = norm.split('\\').pop() || '';
+    const name = splitName || '';
 
     this.ensureParentDirs(norm);
     const existing = this.nodes.get(key);
@@ -305,7 +307,7 @@ int main() {
     if (this.nodes.has(key)) return false;
     this.ensureParentDirs(norm);
     this.nodes.set(key, {
-      name: norm.split('\\\\').pop()!,
+      name: norm.split('\\').pop()!,
       path: norm,
       type: 'directory',
       size: 0,
@@ -375,7 +377,7 @@ int main() {
     this.ensureParentDirs(destNorm);
 
     node.path = destNorm;
-    node.name = destNorm.split('\\\\').pop()!;
+    node.name = destNorm.split('\\').pop()!;
     this.nodes.delete(srcKey);
     this.nodes.set(destNorm.toLowerCase(), node);
 
@@ -390,30 +392,30 @@ int main() {
 
   // === Utility ===
   private normalizePath(path: string): string {
-    let p = path.replace(/\//g, '\\\\');
+    let p = path.replace(/\//g, '\\');
     if (!/^[a-zA-Z]:\\/.test(p)) {
-      p = p.startsWith('\\\\') ? 'C:' + p : this.cwd + (this.cwd.endsWith('\\\\') ? '' : '\\\\') + p;
+      p = p.startsWith('\\') ? 'C:' + p : this.cwd + (this.cwd.endsWith('\\') ? '' : '\\') + p;
     }
-    const parts = p.split('\\\\').filter(Boolean);
+    const parts = p.split('\\').filter(Boolean);
     const stack: string[] = [];
     for (const part of parts) {
       if (part === '..') stack.pop();
       else if (part !== '.') stack.push(part);
     }
-    return stack.join('\\\\');
+    return stack.join('\\');
   }
 
   private ensureParentDirs(path: string): void {
-    const parts = path.split('\\\\');
-    let curr = parts[0] + '\\\\';
+    const parts = path.split('\\');
+    let curr = parts[0] + '\\';
     if (!this.nodes.has(curr.toLowerCase())) {
       this.nodes.set(curr.toLowerCase(), {
-        name: parts[0] + '\\\\', path: curr, type: 'directory', size: 0,
+        name: parts[0] + '\\', path: curr, type: 'directory', size: 0,
         createdAt: Date.now(), modifiedAt: Date.now()
       });
     }
     for (let i = 1; i < parts.length - 1; i++) {
-      curr += parts[i] + '\\\\';
+      curr += parts[i] + '\\';
       const key = curr.toLowerCase();
       if (!this.nodes.has(key)) {
         this.nodes.set(key, {

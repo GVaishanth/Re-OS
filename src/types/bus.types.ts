@@ -45,7 +45,11 @@ export type ReOSEventType =
   | 'THEME:CHANGED'
   | 'THEME:APPLIED'
   | 'FILE:UPLOAD_REQUEST'
-  | 'FILE:DOWNLOAD_REQUEST';
+  | 'FILE:DOWNLOAD_REQUEST'
+  | 'LAYOUT:SET_EDITOR'
+  | 'LAYOUT:SET_EXPLORER'
+  | 'LAYOUT:EDITOR_CHANGED'
+  | 'LAYOUT:EXPLORER_CHANGED';
 
 export interface IReOSEvent<T = unknown> {
   type: ReOSEventType;

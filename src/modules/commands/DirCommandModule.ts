@@ -20,7 +20,7 @@ export class DirCommandModule implements ICommand {
       args.includes('-tree') ||
       args.includes('--tree')
     ) {
-      this.bus.publish('EXPLORER:TOGGLE');
+      this.bus.publish('VFS:DIR_REQUEST', { targetPath: context.cwd, detailed: false, showAll: false });
       return { success: true, exitCode: 0 };
     }
 

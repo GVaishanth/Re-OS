@@ -3,7 +3,6 @@ import { TabManagerModule } from './TabManagerModule';
 import { StatusBarModule } from './StatusBarModule';
 import { TerminalEngineModule } from '@modules/terminal/TerminalEngineModule';
 import { EditorModule } from '@modules/editor/EditorModule';
-import { ExplorerModule } from '@modules/editor/ExplorerModule';
 import { VFSModule } from '@modules/filesystem/VFSModule';
 import { FileTransferModule } from '@modules/filesystem/FileTransferModule';
 import { CommandDispatcher } from '@modules/commands/CommandDispatcher';
@@ -56,7 +55,6 @@ export class AppShellModule implements IAppShellModule {
   private statusBar: StatusBarModule;
   private terminal: TerminalEngineModule;
   private editor: EditorModule;
-  private explorer: ExplorerModule;
   private fileTransfer: FileTransferModule;
   private dispatcher: CommandDispatcher;
   private runController: RunCommandController;
@@ -72,7 +70,6 @@ export class AppShellModule implements IAppShellModule {
     this.statusBar = new StatusBarModule();
     this.terminal = new TerminalEngineModule(this.vfs);
     this.editor = new EditorModule(this.vfs);
-    this.explorer = new ExplorerModule(this.vfs);
     this.fileTransfer = new FileTransferModule(this.vfs);
     this.dispatcher = new CommandDispatcher();
     this.runController = new RunCommandController(this.vfs, this.editor);
@@ -495,8 +492,6 @@ export class AppShellModule implements IAppShellModule {
       this.layout.setEditorOpen(true);
     });
 
-    // EXPLORER:TOGGLE is now handled exclusively inside ExplorerModule
-    // to avoid double-handling and state desync.
   }
 
   public async mount(rootElement: HTMLElement): Promise<void> {
@@ -515,9 +510,7 @@ export class AppShellModule implements IAppShellModule {
         <div id="reos-main-split" class="reos-main-split">
           <div id="reos-editor-zone" class="reos-editor-zone hidden">
             <div id="reos-monaco-container" class="reos-monaco-container"></div>
-            <div id="reos-explorer-overlay" class="reos-explorer-overlay"></div>
           </div>
-          <button id="reos-explorer-toggle-btn" class="reos-explorer-toggle-btn" title="Toggle right-middle Explorer tree overlay (< / >)">&lt;</button>
           <div id="reos-terminal-zone" class="reos-terminal-zone">
             <div id="reos-terminal-container" class="reos-terminal-container"></div>
           </div>
@@ -529,14 +522,12 @@ export class AppShellModule implements IAppShellModule {
 
     const tabContainer = rootElement.querySelector('#reos-tab-strip') as HTMLElement;
     const monacoContainer = rootElement.querySelector('#reos-monaco-container') as HTMLElement;
-    const explorerContainer = rootElement.querySelector('#reos-explorer-overlay') as HTMLElement;
     const terminalContainer = rootElement.querySelector('#reos-terminal-container') as HTMLElement;
     const statusContainer = rootElement.querySelector('#reos-status-bar') as HTMLElement;
     const settingsContainer = rootElement.querySelector('#reos-settings-overlay') as HTMLElement;
 
     if (tabContainer) this.tabManager.mount(tabContainer);
     if (monacoContainer) this.editor.mount(monacoContainer);
-    if (explorerContainer) this.explorer.mount(explorerContainer);
     if (terminalContainer) this.terminal.mount(terminalContainer);
     if (statusContainer) this.statusBar.mount(statusContainer);
     if (settingsContainer) this.settingsOverlay.mount(settingsContainer);
@@ -564,31 +555,6 @@ export class AppShellModule implements IAppShellModule {
     if (settingsBtn)
       settingsBtn.addEventListener('click', () => this.bus.publish('SETTINGS:TOGGLE'));
 
-    // === EXPLORER TOGGLE - FINAL VERSION ===
-    const explorerToggleBtn = rootElement.querySelector('#reos-explorer-toggle-btn');
-    if (explorerToggleBtn) {
-      explorerToggleBtn.addEventListener('click', () => {
-        const panel = document.getElementById('reos-explorer-panel');
-        const btn = explorerToggleBtn as HTMLButtonElement;
-        if (!panel || !btn) return;
-
-        const currentlyOpen = !panel.classList.contains('hidden');
-
-        if (currentlyOpen) {
-            panel.classList.add('hidden');
-            btn.innerText = '<';
-            btn.classList.remove('open');
-        } else {
-            panel.classList.remove('hidden');
-            btn.innerText = '>';
-            btn.classList.add('open');
-
-            if (this.explorer && this.vfs) {
-                void (this.explorer as any).renderOverlayTree?.(this.vfs.getCWD());
-            }
-        }
-      });
-    }
 
     // Drag and drop file upload over terminal
     rootElement.addEventListener('dragover', e => e.preventDefault());
@@ -602,7 +568,6 @@ export class AppShellModule implements IAppShellModule {
     });
 
     this.layout.setEditorOpen(false);
-    this.layout.setExplorerOpen(false);
   }
 
   // DEPRECATED — use LayoutState instead

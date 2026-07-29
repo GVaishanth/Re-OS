@@ -15,6 +15,17 @@ describe('Re`OS Core System Integration Tests', () => {
   let detector: LanguageDetectionModule;
 
   beforeEach(async () => {
+    // Clean any leftover storage data to prevent pollution
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.clear();
+      if (typeof indexedDB !== 'undefined') {
+        const dbNames = ['reos_vfs_db_v1'];
+        for (const name of dbNames) {
+          indexedDB.deleteDatabase(name);
+        }
+      }
+    } catch { /* ignore */ }
+
     vfs = new VFSModule();
     await vfs.init();
 

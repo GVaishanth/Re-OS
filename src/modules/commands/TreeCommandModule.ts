@@ -6,7 +6,7 @@ export class TreeCommandModule implements ICommand {
   public readonly name = 'tree';
   public readonly aliases = [];
   public readonly description =
-    'Toggles the Explorer right-side directory tree overlay or outputs ASCII directory hierarchy.';
+    'Outputs an ASCII directory hierarchy for the current working directory.';
   private bus: ReOSBus = ReOSBus.getInstance();
 
   public async execute(
@@ -14,7 +14,7 @@ export class TreeCommandModule implements ICommand {
     _flags: Map<string, boolean>,
     _context: IExecutionContext
   ): Promise<ICommandResult> {
-    this.bus.publish('EXPLORER:TOGGLE');
+    this.bus.publish('VFS:DIR_REQUEST', { targetPath: _context.cwd, detailed: true, showAll: true });
     return { success: true, exitCode: 0 };
   }
 
